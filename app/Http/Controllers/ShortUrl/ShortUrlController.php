@@ -44,19 +44,7 @@ class ShortUrlController extends BaseController
             return array('error_code' => 13001002, 'msg' => '生成短连接失败');
         }
 
-        $environment = Env::get('APP_ENV');
-        switch ($environment) {
-            case 'dev':
-                $domain = 'sd.nbmj.cn';
-                break;
-            case 'pre':
-                $domain = 'sp.nbmj.cn';
-                break;
-            case 'prod':
-                $domain = 's.nbmj.cn';
-            default:
-        }
-        $shortUrl = 'https://' . $domain . '?c=' . $code . date('ymd');
+        $shortUrl = self::getDomain() . '?c=' . $code . date('ymd');
 
         $result = array('error_code' => 0, 'msg' => '', 'short_url' => $shortUrl);
         LogBeanHelper::info('urlToShortUrl', $result, 0);
@@ -77,13 +65,8 @@ class ShortUrlController extends BaseController
 
         $url = ShortUrlCache::get($code);
         if (!$url) {
-            if (date('ymd') > date('ymd', strtotime('30 days', strtotime($time)))) {
-                // 当前时间在分析时间30天以上的，走ADB，其余走RDS
-                $info = AdbShortUrlModel::getByCode($code);
-            } else {
-                $info = ShortUrlModel::getByCode($code);
-            }
-            $url = $info ? $info->url : '';
+            $info = ShortUrlModel::getByCode($code);
+            $url  = $info ? $info->url : '';
             if ($url) {
                 ShortUrlCache::set($code, $url);
             }
@@ -99,5 +82,14 @@ class ShortUrlController extends BaseController
 
         Header('Location:' . $url);
         exit;
+    }
+
+    public static function getDomain()
+    {
+        $httpType   = ((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https')) ? 'https://' : 'http://';
+
+        $httpDomain = $httpType . $_SERVER['HTTP_HOST'];
+
+        return $httpDomain;
     }
 }
